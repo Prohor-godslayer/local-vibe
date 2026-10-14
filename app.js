@@ -101,9 +101,13 @@ function bootVibe(host) {
         }
         const added = msg.DeviceAdded && msg.DeviceAdded.DeviceIndex;
         const list = msg.DeviceList && msg.DeviceList.Devices;
-        if (added != null) deviceIndex = msg.DeviceAdded.DeviceIndex;
-        if (Array.isArray(list) && list[0]) deviceIndex = list[0].DeviceIndex;
-        if (deviceIndex != null) pushLog('устройство #' + deviceIndex);
+        let nextIndex = null;
+        if (added != null) nextIndex = msg.DeviceAdded.DeviceIndex;
+        if (Array.isArray(list) && list[0] && list[0].DeviceIndex != null) nextIndex = list[0].DeviceIndex;
+        if (nextIndex != null && nextIndex !== deviceIndex) {
+          deviceIndex = nextIndex;
+          pushLog('устройство #' + deviceIndex);
+        }
       });
       render();
     };
@@ -131,8 +135,7 @@ function bootVibe(host) {
   }
 
   function consider(text, fromUser) {
-    const word = String(cfg.safeword || '').trim().toLowerCase();
-    if (fromUser && word && String(text || '').toLowerCase().indexOf(word) !== -1) {
+    if (fromUser && eng.mentionsWord(text, cfg.safeword)) {
       panic('word');
       return;
     }
@@ -153,8 +156,8 @@ function bootVibe(host) {
     const pct = Math.round((level / 20) * 100);
     const linked = socket && socket.readyState === 1;
     ui.body.innerHTML =
-      '<div class="lx-card"><div class="lx-muted">уровень ' + level + ' / ' + cfg.cap + ' · ' + shell.esc(eng.PATTERN_LABEL[cfg.pattern] || cfg.pattern) + '</div>' +
-      '<div class="lx-bar" style="height:18px;margin-top:8px"><span style="width:' + pct + '%"></span></div></div>' +
+      '<div class="lx-card"><div class="lx-muted" id="lx-readout">уровень ' + level + ' / ' + cfg.cap + ' · ' + shell.esc(eng.PATTERN_LABEL[cfg.pattern] || cfg.pattern) + '</div>' +
+      '<div class="lx-bar" style="height:18px;margin-top:8px"><span id="lx-meter" style="width:' + pct + '%"></span></div></div>' +
       '<label class="lx-field">Руками<input id="lx-level" type="range" min="0" max="' + cfg.cap + '" value="' + level + '"></label>' +
       '<div class="lx-grid">' + eng.PATTERNS.map((p) =>
         '<button type="button" class="lx-btn' + (cfg.pattern === p ? ' primary' : '') + '" data-act="pat" data-p="' + p + '">' + shell.esc(eng.PATTERN_LABEL[p]) + '</button>'
@@ -166,9 +169,13 @@ function bootVibe(host) {
       '<button type="button" class="lx-btn" data-act="go" data-view="link">Устройство</button></div>' +
       '<div class="lx-list">' + log.map((l) => '<div class="lx-muted">' + shell.esc(l.text) + '</div>').join('') + '</div>';
     ui.body.querySelector('#lx-level').addEventListener('input', (e) => {
-      if (locked) return;
+      if (locked) { e.target.value = String(level); return; }
       level = eng.clampLevel(e.target.value, cfg.cap);
       if (level > 0 && !running) { running = true; started = Date.now(); }
+      const meter = ui.body.querySelector('#lx-meter');
+      if (meter) meter.style.width = Math.round((level / 20) * 100) + '%';
+      const readout = ui.body.querySelector('#lx-readout');
+      if (readout) readout.textContent = 'уровень ' + level + ' / ' + cfg.cap + ' · ' + (eng.PATTERN_LABEL[cfg.pattern] || cfg.pattern);
       publish();
     });
   }
@@ -245,12 +252,20 @@ function bootVibe(host) {
       return;
     }
     if (act === 'test') {
-      const prev = level;
+      const prevLevel = level;
+      const prevRun = running;
+      const prevStarted = started;
       level = Math.min(cfg.cap, 6);
       running = true;
       started = Date.now();
       tick();
-      setTimeout(() => { level = prev; if (!cfg.aiControl) { running = false; stopHardware(); } render(); }, 700);
+      setTimeout(() => {
+        level = prevLevel;
+        running = prevRun;
+        started = prevStarted;
+        if (!running) stopHardware();
+        render();
+      }, 700);
     }
   });
 
