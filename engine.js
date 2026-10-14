@@ -28,6 +28,13 @@ function isLocalDeviceUrl(url) {
   return false;
 }
 
+function mentionsWord(text, word) {
+  const needle = String(word || '').trim();
+  if (!needle) return false;
+  const esc = needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp('(^|[^a-zа-яё0-9])' + esc + '([^a-zа-яё0-9]|$)', 'i').test(String(text || ''));
+}
+
 function clampLevel(n, cap) {
   const c = Math.max(0, Math.min(20, Number(cap) || 20));
   let v = Number(n) || 0;
@@ -98,7 +105,7 @@ function defaultCfg() {
 }
 
 const LocalVibeEngine = {
-  PATTERNS, PATTERN_LABEL, isLocalDeviceUrl, clampLevel, parseScene, smooth, patternValue, outputLevel, defaultCfg,
+  PATTERNS, PATTERN_LABEL, isLocalDeviceUrl, mentionsWord, clampLevel, parseScene, smooth, patternValue, outputLevel, defaultCfg,
 };
 globalThis.LocalVibeEngine = LocalVibeEngine;
 export { LocalVibeEngine };

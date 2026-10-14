@@ -87,6 +87,7 @@ function createSillyHost(appKey) {
       try { await saveMetadata(); } catch (e) { /* старые сборки пишут metadata вместе с чатом */ }
     },
     toast(msg) {
+      if (!msg) return;
       try {
         if (globalThis.toastr) globalThis.toastr.info(String(msg));
       } catch (e) { /* панель показывает ту же строку сама */ }
